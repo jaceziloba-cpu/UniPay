@@ -1,0 +1,45 @@
+{
+  "name": "unipay-africa",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Bibliothèque TypeScript ultra-légère, modulaire et résiliente pour unifier les passerelles de paiement africaines (FedaPay, CinetPay, Wave, Orange Money) avec basculement automatique et intégration Firebase.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --experimental-strip-types test/**/*.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "payment",
+    "africa",
+    "fintech",
+    "fedapay",
+    "cinetpay",
+    "wave",
+    "orange-money",
+    "mobile-money",
+    "xof",
+    "xaf",
+    "firebase",
+    "fallback",
+    "resilience"
+  ],
+  "author": "UniPay Africa Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
