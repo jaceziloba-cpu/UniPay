@@ -31,31 +31,33 @@ L'intégration des paiements en Afrique subsaharienne (zone UEMOA, CEMAC, etc.) 
 
 ```mermaid
 flowchart TD
-    App["Application Marchande (Node.js / Next.js / Nest / Edge)"]
+    App["Application Marchande (Node.js, Next.js, Edge)"]
     Client["UniPayClient (Orchestrateur & Fallback)"]
 
-    App -->|createPayment()| Client
+    App -->|createPayment| Client
 
-    subgraph "Mécanisme de Basculement Automatique"
-        GW1["Passerelle Primaire\n(ex: FedaPay)"]
-        GW2["Passerelle Secours 1\n(ex: CinetPay)"]
-        GW3["Passerelle Secours 2\n(ex: PayDunya / Kkiapay)"]
+    subgraph FallbackGroup ["Mécanisme de Basculement Automatique"]
+        GW1["Passerelle Primaire (ex: FedaPay)"]
+        GW2["Passerelle Secours 1 (ex: CinetPay)"]
+        GW3["Passerelle Secours 2 (ex: PayDunya, Kkiapay)"]
 
         Client -->|1. Essai initial| GW1
-        GW1 -.->|Échec 5xx / Timeout| Client
+        GW1 -.->|Échec 5xx ou Timeout| Client
         Client -->|2. Basculement auto| GW2
         GW2 -.->|Si échec| Client
         Client -->|3. Secours| GW3
     end
 
-    subgraph "Webhooks & Synchronisation Base de Données"
+    subgraph WebhookGroup ["Webhooks & Synchronisation Base de Données"]
         WH["WebhookDispatcher"]
         Detect["Détection auto & Vérification HMAC"]
         Normalize["NormalizedWebhookEvent (format universel)"]
         DB["Gestionnaire d'abonnements agnostique"]
 
-        WH --> Detect --> Normalize --> DB
-        DB -->|Mise à jour état| AnyDB[("Firebase / Supabase\nMongoDB / Prisma / …")]
+        WH --> Detect
+        Detect --> Normalize
+        Normalize --> DB
+        DB -->|Mise à jour état| AnyDB[("Firebase / Supabase / MongoDB / PostgreSQL")]
     end
 ```
 
