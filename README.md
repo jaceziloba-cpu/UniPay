@@ -1,10 +1,10 @@
 # 🌍 UniPay Africa
 
-> SDK TypeScript universel, modulaire et ultra-résilient pour unifier les passerelles de paiement africaines (**FedaPay, CinetPay, Wave, Orange Money**) avec **basculement automatique (Failover)** et **synchronisation Firebase agnostique**.
+> SDK TypeScript universel, modulaire et ultra-résilient pour unifier les passerelles de paiement africaines (**FedaPay, CinetPay, PayDunya, Kkiapay**) avec **basculement automatique** et **intégration agnostique avec toute base de données**.
 
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20runtime-brightgreen.svg)](#caractéristiques-clés)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20runtime-brightgreen.svg)](#résilience)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue.svg)](#architecture)
-[![Coverage](https://img.shields.io/badge/tests-100%25%20passing-success.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-100%25%20passing-success.svg)](#tests)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -12,17 +12,18 @@
 ## 🎯 Pourquoi UniPay ?
 
 L'intégration des paiements en Afrique subsaharienne (zone UEMOA, CEMAC, etc.) confronte les développeurs et startups à des défis majeurs :
-1. **Fragmentation extrême des passerelles** : FedaPay, CinetPay, Wave, Orange Money, MTN MoMo, Moov Money possèdent chacun leur propre format de payload, protocoles de signature et statuts de transaction.
-2. **Disponibilité variable et pannes API fréquentes** : Une coupure réseau ou une saturation chez un opérateur mobile entraîne immédiatement une perte de conversions pour le marchand.
-3. **Complexité des webhooks** : Chaque passerelle notifie différemment (paramètres GET, corps JSON, formats d'horodatage hétérogènes).
-4. **Intégration d'abonnements** : Mettre à jour l'accès utilisateur (ex: Firebase / Firestore) nécessite souvent du code répétitif et sensible aux failles de sécurité.
+
+1. **Fragmentation extrême des passerelles** : FedaPay, CinetPay, PayDunya, Kkiapay, Wave, Orange Money possèdent chacun leur propre format de payload, protocoles de signature et statuts de transaction.
+2. **Disponibilité variable et pannes API** : Une coupure réseau ou une saturation chez un opérateur entraîne immédiatement une perte de conversions pour le marchand.
+3. **Complexité des webhooks** : Chaque passerelle notifie différemment (corps JSON hétérogènes, formats de signature variables).
+4. **Mise à jour des abonnements** : Synchroniser l'accès utilisateur après un paiement nécessite du code répétitif avec n'importe quelle base de données.
 
 **UniPay résout ces problèmes grâce à :**
 - Une **interface unifiée** (`createPayment`, `verifyPayment`, `parseWebhook`).
-- Un **mécanisme de Failover automatique intelligent** : si l'API primaire est inaccessible ou renvoie une erreur serveur (5xx/timeout), UniPay bascule de façon transparente sur la passerelle de secours configurée pour le pays ou la devise.
-- Un **moteur de webhooks agnostique** et sécurisé par HMAC-SHA256.
-- Un **connecteur Firebase Firestore découplé** (Duck-typed, sans forcer de dépendance lourde).
-- **Zéro dépendance d'exécution** : utilise exclusivement l'API native `fetch` et `node:crypto`.
+- Un **basculement automatique intelligent** : si l'API primaire échoue (5xx/timeout), UniPay bascule de façon transparente sur la passerelle de secours.
+- Un **moteur de webhooks agnostique** sécurisé par HMAC-SHA256.
+- Un **gestionnaire d'abonnements universel** compatible avec toute base de données : Firebase, Supabase, MongoDB, Prisma, PostgreSQL, etc.
+- **Zéro dépendance d'exécution** : uniquement l'API native `fetch` et `node:crypto`.
 
 ---
 
@@ -31,30 +32,30 @@ L'intégration des paiements en Afrique subsaharienne (zone UEMOA, CEMAC, etc.) 
 ```mermaid
 flowchart TD
     App["Application Marchande (Node.js / Next.js / Nest / Edge)"]
-    Client["UniPayClient (Orchestrateur & Circuit Breaker)"]
-    
+    Client["UniPayClient (Orchestrateur & Fallback)"]
+
     App -->|createPayment()| Client
-    
-    subgraph "Mécanisme de Basculement (Fallback Chain)"
+
+    subgraph "Mécanisme de Basculement Automatique"
         GW1["Passerelle Primaire\n(ex: FedaPay)"]
         GW2["Passerelle Secours 1\n(ex: CinetPay)"]
-        GW3["Passerelle Secours 2\n(ex: Wave / OM)"]
-        
+        GW3["Passerelle Secours 2\n(ex: PayDunya / Kkiapay)"]
+
         Client -->|1. Essai initial| GW1
         GW1 -.->|Échec 5xx / Timeout| Client
-        Client -->|2. Failover automatique| GW2
+        Client -->|2. Basculement auto| GW2
         GW2 -.->|Si échec| Client
         Client -->|3. Secours| GW3
     end
-    
-    subgraph "Gestion Agnostique des Webhooks"
+
+    subgraph "Webhooks & Synchronisation Base de Données"
         WH["WebhookDispatcher"]
-        Detect["Détection automatique & Vérification HMAC"]
-        Normalize["Normalisation standardisée (NormalizedWebhookEvent)"]
-        FB["Firebase Subscription Sync"]
-        
-        WH --> Detect --> Normalize --> FB
-        FB -->|Mise à jour état| Firestore[("Cloud Firestore / Firebase")]
+        Detect["Détection auto & Vérification HMAC"]
+        Normalize["NormalizedWebhookEvent (format universel)"]
+        DB["Gestionnaire d'abonnements agnostique"]
+
+        WH --> Detect --> Normalize --> DB
+        DB -->|Mise à jour état| AnyDB[("Firebase / Supabase\nMongoDB / Prisma / …")]
     end
 ```
 
@@ -65,36 +66,33 @@ flowchart TD
 ```
 UniPay/
 ├── src/
-│   ├── index.ts                      # Point d'entrée de la librairie
+│   ├── index.ts                          # Point d'entrée de la librairie
 │   ├── types/
-│   │   ├── payment.ts                # Modèles standardisés (Input, Status, Currency)
-│   │   ├── gateway.ts                # Contrat d'interface des passerelles
-│   │   ├── webhook.ts                # Modèle normalisé des événements entrants
+│   │   ├── payment.ts                    # Modèles standardisés (Input, Status, Currency)
+│   │   ├── gateway.ts                    # Contrat d'interface des passerelles
+│   │   ├── webhook.ts                    # Modèle normalisé des événements entrants
 │   │   └── index.ts
 │   ├── errors/
-│   │   ├── unipay-error.ts           # Hiérarchie typée des exceptions
-│   │   └── index.ts
+│   │   └── unipay-error.ts               # Hiérarchie typée des exceptions
 │   ├── core/
-│   │   ├── base-adapter.ts           # Classe de base avec HTTP natif, retries & timeout
-│   │   ├── unipay-client.ts          # Orchestrateur & moteur de fallback automatique
-│   │   └── index.ts
+│   │   ├── base-adapter.ts               # Moteur HTTP unifié : retries, timeout, erreurs
+│   │   └── unipay-client.ts              # Orchestrateur & moteur de basculement automatique
 │   ├── adapters/
-│   │   ├── fedapay/                  # Implémentation concrète FedaPay (Bénin, Togo, CI...)
-│   │   ├── cinetpay/                 # Implémentation concrète CinetPay (CI, SN, CM, ML...)
-│   │   └── index.ts
+│   │   ├── fedapay/                      # FedaPay (Bénin, Togo, CI, Sénégal…)
+│   │   ├── cinetpay/                     # CinetPay (CI, Sénégal, Cameroun, ML…)
+│   │   ├── paydunya/                     # PayDunya (Sénégal, CI, Bénin, Togo…)
+│   │   └── kkiapay/                      # Kkiapay (Bénin, CI, Sénégal, Cameroun…)
 │   ├── webhooks/
-│   │   ├── webhook-dispatcher.ts     # Routeur de notifications & vérification de signature
-│   │   ├── firebase-handler.ts       # Synchroniseur d'abonnements pour Firebase / Firestore
-│   │   └── index.ts
+│   │   ├── webhook-dispatcher.ts         # Répartiteur & validation HMAC des webhooks
+│   │   └── subscription-handler.ts       # Gestionnaire d'abonnements universel
 │   └── utils/
-│       ├── crypto.ts                 # Utilitaires HMAC et comparaison à temps constant
-│       └── index.ts
+│       └── crypto.ts                     # HMAC & comparaisons à temps constant
 ├── examples/
-│   ├── basic-checkout.ts             # Exemple d'encaissement direct
-│   ├── fallback-resilience.ts        # Exemple de haute disponibilité et tolérance aux pannes
-│   └── webhook-firebase-server.ts    # Serveur HTTP de webhook avec mise à jour Firestore
+│   ├── basic-checkout.ts                 # Exemple d'encaissement standard
+│   ├── fallback-resilience.ts            # Démonstration du basculement automatique
+│   └── webhook-firebase-server.ts        # Exemple de serveur webhook
 └── test/
-    └── unipay.test.ts                # Suite de tests unitaires (Node Test Runner)
+    └── unipay.test.ts                    # Suite de tests unitaires (Node Test Runner)
 ```
 
 ---
@@ -109,149 +107,152 @@ pnpm add unipay-africa
 yarn add unipay-africa
 ```
 
-> **Prérequis runtime** : Node.js ≥ 18.0.0 (compatible Deno, Bun et Cloudflare Workers).
+> **Prérequis** : Node.js ≥ 18.0.0 (compatible Deno, Bun et Cloudflare Workers).
 
 ---
 
 ## 💡 Guide d'Utilisation
 
-### 1. Initialisation avec Haute Disponibilité (Fallback)
+### 1. Avec une seule passerelle (cas le plus simple)
 
 ```typescript
-import { UniPayClient, FedaPayAdapter, CinetPayAdapter } from 'unipay-africa';
+import { UniPayClient, KkiapayAdapter } from 'unipay-africa';
 
-// Configurer les adaptateurs dans l'ordre de priorité
 const unipay = new UniPayClient({
   gateways: [
-    new FedaPayAdapter({
-      apiKey: process.env.FEDAPAY_SECRET_KEY!,
-      webhookSecret: process.env.FEDAPAY_WEBHOOK_SECRET,
-      isSandbox: process.env.NODE_ENV !== 'production',
-    }),
-    new CinetPayAdapter({
-      apiKey: process.env.CINETPAY_API_KEY!,
-      siteId: process.env.CINETPAY_SITE_ID!,
-      secretKey: process.env.CINETPAY_SECRET_KEY,
-      isSandbox: process.env.NODE_ENV !== 'production',
+    new KkiapayAdapter({
+      publicKey: process.env.KKIAPAY_PUBLIC_KEY!,
+      privateKey: process.env.KKIAPAY_PRIVATE_KEY!,
     }),
   ],
-  enableFallback: true, // Active le basculement transparent
+});
+```
+
+---
+
+### 2. Avec plusieurs passerelles et basculement automatique
+
+```typescript
+import { UniPayClient, FedaPayAdapter, CinetPayAdapter, PayDunyaAdapter, KkiapayAdapter } from 'unipay-africa';
+
+const unipay = new UniPayClient({
+  gateways: [
+    new FedaPayAdapter({ apiKey: process.env.FEDAPAY_SECRET_KEY! }),
+    new CinetPayAdapter({ apiKey: process.env.CINETPAY_API_KEY!, siteId: process.env.CINETPAY_SITE_ID! }),
+    new PayDunyaAdapter({ masterKey: process.env.PAYDUNYA_MASTER_KEY!, publicKey: process.env.PAYDUNYA_PUBLIC_KEY!, privateKey: process.env.PAYDUNYA_PRIVATE_KEY!, token: process.env.PAYDUNYA_TOKEN! }),
+    new KkiapayAdapter({ publicKey: process.env.KKIAPAY_PUBLIC_KEY!, privateKey: process.env.KKIAPAY_PRIVATE_KEY! }),
+  ],
+  enableFallback: true,
   onFallback: (event) => {
-    console.warn(`[FAILOVER] Passerelle ${event.primaryProvider} indisponible.`);
-    console.warn(`Basculement automatique vers ${event.fallbackProvider}`);
+    console.warn(`[BASCULEMENT] ${event.primaryProvider} indisponible → ${event.fallbackProvider}`);
   },
 });
 ```
 
 ---
 
-### 2. Création d'une Transaction Standardisée
+### 3. Création d'une transaction
 
 ```typescript
 const payment = await unipay.createPayment({
   reference: `CMD_${Date.now()}`,
   amount: 5000,
-  currency: 'XOF', // XOF (FCFA UEMOA), XAF (CEMAC), GNF, CDF, USD
-  description: 'Accès mensuel Pro UniPay',
-  returnUrl: 'https://mon-application.com/paiement/retour',
-  callbackUrl: 'https://api.mon-application.com/webhooks/paiement',
+  currency: 'XOF',
+  description: 'Abonnement mensuel Pro',
+  returnUrl: 'https://mon-app.com/paiement/retour',
+  callbackUrl: 'https://api.mon-app.com/webhooks/paiement',
   customer: {
     firstName: 'Amadou',
     lastName: 'Kouassi',
-    email: 'amadou.kouassi@example.com',
+    email: 'amadou@example.com',
     phoneNumber: '+2250700000000',
-    country: 'CI', // Côte d'Ivoire
-    city: 'Abidjan',
+    country: 'CI',
   },
   metadata: {
     userId: 'usr_abc123',
     planId: 'pro_monthly',
-    durationDays: 30,
   },
 });
 
-console.log(`Passerelle utilisée : ${payment.provider}`);
-console.log(`Lien de paiement pour le client : ${payment.paymentUrl}`);
+console.log(`Passerelle active : ${payment.provider}`);
+console.log(`Lien de paiement : ${payment.paymentUrl}`);
 ```
 
 ---
 
-### 3. Traitement des Webhooks & Mise à Jour Firebase Firestore
+### 4. Webhooks & Synchronisation avec votre base de données
 
-UniPay comprend un gestionnaire prêt à l'emploi pour synchroniser automatiquement l'état des abonnements dans votre base Firestore sans ajouter de complexité :
+Le gestionnaire `createSubscriptionHandler` est **compatible avec toute base de données** :
 
 ```typescript
-import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
-import { WebhookDispatcher, createFirebaseSubscriptionHandler } from 'unipay-africa';
+import { WebhookDispatcher, createSubscriptionHandler } from 'unipay-africa';
 
-const app = express();
-const db = getFirestore(); // Instance Firestore de firebase-admin
-
-// 1. Initialiser le dispatcher de webhooks
 const dispatcher = new WebhookDispatcher(unipay.getAllGateways());
 
-// 2. Créer le gestionnaire d'abonnement Firebase
-const syncFirebaseSubscription = createFirebaseSubscriptionHandler(db, {
-  documentPathPattern: 'users/{userId}/subscriptions/{subscriptionId}',
-  defaultDurationDays: 30,
-});
+// ─── Avec Firebase ───────────────────────────────────────────────
+import { getFirestore } from 'firebase-admin/firestore';
+const sync = createSubscriptionHandler(getFirestore(), { documentPathPattern: 'users/{userId}/subscriptions/{subscriptionId}' });
 
-// 3. Connecter les événements
+// ─── Avec Supabase ───────────────────────────────────────────────
+// const sync = createSubscriptionHandler(createSupabaseStore(supabase), { ... });
+
+// ─── Avec MongoDB / Prisma ───────────────────────────────────────
+// const sync = createSubscriptionHandler(createMongoStore(db), { ... });
+
+// Connexion des événements (identique quelle que soit la base de données)
 dispatcher.on('payment.success', async (event) => {
-  console.log(`Paiement confirmé pour ${event.reference}`);
-  await syncFirebaseSubscription(event);
+  await sync(event); // Statut → ACTIVE
 });
 
 dispatcher.on('payment.failed', async (event) => {
-  console.warn(`Paiement refusé pour ${event.reference}`);
-  await syncFirebaseSubscription(event);
+  await sync(event); // Statut → PAST_DUE
 });
 
-// 4. Endpoint unique universel
-app.post('/api/webhooks/payments', express.raw({ type: '*/*' }), async (req, res) => {
-  try {
-    const rawBody = req.body.toString('utf-8');
-    const payload = JSON.parse(rawBody);
-
-    const event = await dispatcher.handleWebhook(payload, {
-      rawBody,
-      headers: req.headers,
-      verifySignature: true, // Vérifie la signature HMAC cryptographique
-    });
-
-    res.json({ status: 'success', eventId: event.eventId });
-  } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
-  }
+// Endpoint HTTP universel (Express, Fastify, Nest, Cloud Functions…)
+app.post('/webhooks/paiement', express.raw({ type: '*/*' }), async (req, res) => {
+  const event = await dispatcher.handleWebhook(JSON.parse(req.body), {
+    rawBody: req.body,
+    headers: req.headers,
+    verifySignature: true,
+  });
+  res.json({ received: true, eventId: event.eventId });
 });
 ```
 
 ---
 
-## 🛡️ Résilience et DevOps
+## 🌍 Couverture des Passerelles
 
-| Fonctionnalité | Description |
-| :--- | :--- |
-| **Circuit Breaker & Retry** | Retries automatiques avec exponential backoff et jitter en cas d'erreur réseau temporaire (502, 503, 504, 429). |
-| **Strict Timeout** | Chaque appel dispose d'un timeout configurable avec `AbortSignal.timeout` pour empêcher les blocages de processus. |
-| **Timing-safe Equal** | Vérification des signatures de webhooks à temps constant via `crypto.timingSafeEqual` contre les attaques temporelles. |
-| **Zero Runtime Dependencies** | Empreinte minimale (< 25 Ko minifié), élimination des risques de failles de sécurité de chaîne d'approvisionnement (Supply Chain Vulnerabilities). |
+| Passerelle | Pays couverts | Devises | Remboursements |
+|---|---|---|---|
+| **FedaPay** | Bénin, CI, Togo, Sénégal, Mali, BF, Niger | XOF | ✅ |
+| **CinetPay** | CI, Sénégal, Cameroun, BF, Mali, Congo, Guinée | XOF, XAF, USD | ❌ |
+| **PayDunya** | Sénégal, CI, Bénin, Togo, Mali, BF, Guinée, Niger | XOF | ❌ |
+| **Kkiapay** | Bénin, CI, Sénégal, Togo, Cameroun, BF, Mali | XOF, XAF | ✅ |
 
 ---
 
-## 🧪 Exécution des Tests
+## 🛡️ Résilience
+
+| Fonctionnalité | Description |
+| :--- | :--- |
+| **Basculement automatique** | Si une passerelle est indisponible, la suivante prend le relais de façon transparente. |
+| **Retries exponentiels** | Tentatives automatiques avec backoff et jitter sur erreurs réseau transitoires (429, 502, 503). |
+| **Timeout strict** | Chaque appel est limité dans le temps via `AbortController` pour éviter tout blocage. |
+| **Vérification HMAC** | Signatures des webhooks validées à temps constant via `crypto.timingSafeEqual`. |
+| **Zéro dépendance** | Aucun package tiers requis — empreinte minimale, risque zéro sur la chaîne d'approvisionnement. |
+
+---
+
+## 🧪 Tests
 
 ```bash
-# Compilation du code TypeScript
-npm run build
-
-# Exécution de la suite de tests automatisés
-npm test
+npm run build  # Compiler
+npm test       # Lancer les tests
 ```
 
 ---
 
 ## 📄 Licence
 
-Ce projet est sous licence **MIT**. Libre d'utilisation pour tout projet commercial ou open-source.
+Licence **MIT** — libre d'utilisation pour tout projet commercial ou open-source.
