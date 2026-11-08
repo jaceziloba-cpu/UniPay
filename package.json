@@ -2,9 +2,9 @@
   "name": "unipay-africa",
   "version": "1.0.0",
   "type": "module",
-  "description": "Bibliothèque TypeScript ultra-légère, modulaire et résiliente pour unifier les passerelles de paiement africaines (FedaPay, CinetPay, Wave, Orange Money) avec basculement automatique et intégration Firebase.",
+  "description": "SDK TypeScript universel, modulaire et ultra-résilient pour unifier les passerelles de paiement africaines (FedaPay, CinetPay, PayDunya, Kkiapay) avec basculement automatique et intégration agnostique.",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -13,27 +13,41 @@
       "require": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "node --test --experimental-strip-types test/**/*.test.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && npm test"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaceziloba-cpu/UniPay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jaceziloba-cpu/UniPay/issues"
+  },
+  "homepage": "https://github.com/jaceziloba-cpu/UniPay#readme",
   "keywords": [
     "payment",
     "africa",
     "fintech",
     "fedapay",
     "cinetpay",
+    "paydunya",
+    "kkiapay",
     "wave",
     "orange-money",
     "mobile-money",
     "xof",
     "xaf",
-    "firebase",
     "fallback",
     "resilience"
   ],
-  "author": "UniPay Africa Contributors",
+  "author": "jaceziloba-cpu",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.0",
